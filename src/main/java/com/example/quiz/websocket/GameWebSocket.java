@@ -5,6 +5,7 @@ import com.example.quiz.game.GameService;
 import com.example.quiz.game.WsMessage;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.vertx.core.Vertx;
 import jakarta.inject.Inject;
 import jakarta.websocket.OnClose;
 import jakarta.websocket.OnError;
@@ -12,6 +13,7 @@ import jakarta.websocket.OnMessage;
 import jakarta.websocket.OnOpen;
 import jakarta.websocket.Session;
 import jakarta.websocket.server.ServerEndpoint;
+import org.jboss.logging.Logger;
 
 import java.util.Map;
 
@@ -23,21 +25,33 @@ import java.util.Map;
  * responder. Los eventos de salida usan el envoltorio estándar
  * {"type", "gameId", "payload"} y los emite el GameService vía broadcaster.
  *
+ * <p>Hilos: los handlers de Undertow corren en el event loop de Vert.x, pero
+ * el motor de juego consulta PostgreSQL con transacciones JTA, que Quarkus
+ * prohíbe en el IO thread ("Cannot start a JTA transaction from the IO
+ * thread"). Por eso cada mensaje se despacha a un hilo worker del pool de
+ * Vert.x antes de tocar el GameService. La concurrencia por partida la
+ * garantiza el propio {@code synchronized(session)} del GameService.
+ *
  * <p>Regla de seguridad: el servidor es la autoridad (tiempo, respuestas y
  * puntuaciones). El navegador solo envía intenciones.
  */
 @ServerEndpoint("/ws/game")
 public class GameWebSocket {
 
+    private static final Logger LOG = Logger.getLogger(GameWebSocket.class);
+
     private final SessionRegistry registry;
     private final GameService gameService;
     private final ObjectMapper objectMapper;
+    private final Vertx vertx;
 
     @Inject
-    public GameWebSocket(SessionRegistry registry, GameService gameService, ObjectMapper objectMapper) {
+    public GameWebSocket(SessionRegistry registry, GameService gameService,
+                         ObjectMapper objectMapper, Vertx vertx) {
         this.registry = registry;
         this.gameService = gameService;
         this.objectMapper = objectMapper;
+        this.vertx = vertx;
     }
 
     @OnOpen
@@ -47,6 +61,14 @@ public class GameWebSocket {
 
     @OnMessage
     public void onMessage(String text, Session session) {
+        // Fuera del IO thread: START_GAME/ANSWER llegan a PostgreSQL (JTA).
+        vertx.executeBlocking(() -> {
+            dispatch(text, session);
+            return null;
+        }).onFailure(error -> LOG.errorf(error, "Error procesando mensaje WebSocket: %s", text));
+    }
+
+    private void dispatch(String text, Session session) {
         try {
             JsonNode message = objectMapper.readTree(text);
             String type = message.path("type").asText("");

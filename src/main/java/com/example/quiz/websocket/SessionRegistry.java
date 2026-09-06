@@ -63,18 +63,66 @@ public class SessionRegistry implements GameEventBroadcaster {
     public void broadcast(WsMessage message) {
         Set<Session> sessions = sessionsByGame.getOrDefault(message.gameId(), Set.of());
         for (Session session : sessions) {
+            if (!session.isOpen()) {
+                // Sesión muerta detectada antes de enviar: se limpia y se sigue.
+                unbind(session);
+                continue;
+            }
             send(session, message);
         }
     }
 
-    /** Envía un mensaje a una única sesión. */
+    /**
+     * Envía un mensaje a una única sesión con la API ASÍNCRONA.
+     *
+     * <p>Regla de oro: el envío nunca debe bloquear el hilo que llama. Estos
+     * broadcasts corren en los event loops de Vert.x (y, vía GameService, bajo
+     * el monitor de la partida); {@code getBasicRemote().sendText} es una
+     * escritura síncrona que, si el cliente deja de leer (pestaña dormida, red
+     * cortada sin cierre TCP), esperaba para siempre al promesa del canal:
+     * eso congelaba el event loop y, con él, todas las partidas y peticiones.
+     * Con {@code getAsyncRemote().sendText} la escritura se encola y el
+     * resultado llega por callback; un fallo limpia la sesión rota.
+     */
     public void send(Session session, WsMessage message) {
+        String payload;
         try {
-            synchronized (session) {
-                session.getBasicRemote().sendText(objectMapper.writeValueAsString(message));
+            payload = objectMapper.writeValueAsString(message);
+        } catch (Exception e) {
+            unbind(session); // ni siquiera se puede serializar: sesión inviable
+            return;
+        }
+        synchronized (session) {
+            if (!session.isOpen()) {
+                unbind(session);
+                return;
+            }
+            try {
+                session.getAsyncRemote().sendText(payload, result -> {
+                    if (!result.isOK()) {
+                        cleanupBrokenSession(session);
+                    }
+                });
+            } catch (Exception e) {
+                // Lanzado al encolar (sesión cerrada a mitad de envío, etc.)
+                cleanupBrokenSession(session);
+            }
+        }
+    }
+
+    /**
+     * Cierra (si sigue abierta) y desvincula una sesión cuyo envío falló.
+     * Al cerrar, {@code onClose} del endpoint avisa al GameService
+     * (jugador desconectado); el unbind de aquí es idempotente.
+     */
+    private void cleanupBrokenSession(Session session) {
+        try {
+            if (session.isOpen()) {
+                session.close();
             }
         } catch (Exception e) {
-            // Sesión rota o cerrada: se limpia ahora y en onClose
+            // Sesión rota o ya cerrada: la limpieza la completa onClose
+        } finally {
             unbind(session);
         }
     }
