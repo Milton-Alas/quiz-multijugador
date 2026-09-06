@@ -422,9 +422,9 @@ public class GameService {
                 throw new IllegalArgumentException(
                         "La partida debe estar IN_PROGRESS para elegir preguntas");
             }
-            if (session.currentRound >= session.totalRounds) {
+            if (session.currentRound >= totalQuestionPlays(session)) {
                 throw new IllegalArgumentException(
-                        "La partida ya completó sus " + session.totalRounds + " rondas");
+                        "La partida ya completó sus " + totalQuestionPlays(session) + " turnos de pregunta");
             }
 
             Map<String, List<Long>> pools = questionRepository
@@ -487,9 +487,13 @@ public class GameService {
         payload.put("optionD", question.optionD);
         payload.put("timeLimitMs", QUESTION_TIME_LIMIT_MS);
         if (session.mode == GameMode.LOCAL) {
-            // En misma pantalla el sistema anuncia de quién es el turno.
+            // Misma pantalla: el sistema anuncia de quién es el turno. Una
+            // "ronda" (ciclo) la juegan todos; cada turno es su propia pregunta.
             Player turn = currentTurnPlayer(session);
             if (turn != null) {
+                int playerCount = session.players.size();
+                payload.put("cycle", (selected.round() - 1) / playerCount + 1);
+                payload.put("turnOrder", (selected.round() - 1) % playerCount + 1);
                 payload.put("player", Map.of("playerId", turn.playerId, "nickname", turn.nickname));
             }
         }
@@ -526,8 +530,8 @@ public class GameService {
      * siguiente ronda o el fin de la partida. Asume el lock de session.
      *
      * <p>En modo ONLINE se califica a todos los jugadores de la ronda; en
-     * modo LOCAL solo al jugador del turno (los demás no jugaron la ronda y
-     * no deben aparecer como "sin respuesta").
+     * modo LOCAL solo al jugador del turno (los demás no jugaron esa
+     * pregunta y no deben aparecer como "sin respuesta").
      */
     private void closeRoundAndAdvance(GameSession session) {
         cancelRoundTimer(session);
@@ -568,7 +572,7 @@ public class GameService {
         session.currentRoundAnswers.clear();
         session.answerTimesMs.clear();
 
-        if (round >= session.totalRounds || session.insufficientQuestions) {
+        if (round >= totalQuestionPlays(session) || session.insufficientQuestions) {
             finishGame(session);
         } else {
             broadcast(session, GameEvents.NEXT_QUESTION, Map.of("round", round + 1));
@@ -666,9 +670,26 @@ public class GameService {
     }
 
     /**
-     * Jugador al que le toca responder la ronda actual (solo modo LOCAL):
-     * rotación en el orden de la sala — ronda 1 la responde el jugador[0],
-     * ronda 2 el jugador[1], etc. En ONLINE devuelve {@code null}.
+     * Cantidad total de preguntas que se juegan en la partida.
+     * <ul>
+     *   <li>ONLINE: cada ronda es una pregunta que responden todos a la vez
+     *       -> {@code totalRounds} preguntas.</li>
+     *   <li>LOCAL: cada ronda (ciclo) la juegan TODOS los jugadores por
+     *       turnos y cada uno responde su propia pregunta -> {@code totalRounds}
+     *       preguntas POR JUGADOR (totalRounds × jugadores en total).</li>
+     * </ul>
+     */
+    private int totalQuestionPlays(GameSession session) {
+        if (session.mode == GameMode.LOCAL) {
+            return session.players.size() * session.totalRounds;
+        }
+        return session.totalRounds;
+    }
+
+    /**
+     * Jugador al que le toca responder el turno actual (solo modo LOCAL).
+     * Cada ronda (ciclo) la juegan todos en orden de la sala; el turno rota
+     * Ana, Luis, Mia, Ana, Luis, Mia… En ONLINE devuelve {@code null}.
      */
     private Player currentTurnPlayer(GameSession session) {
         if (session.mode != GameMode.LOCAL || session.players.isEmpty()) {
