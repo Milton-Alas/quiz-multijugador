@@ -1,0 +1,299 @@
+/* ============================================================
+   Quiz Multijugador — estilos pensados para niños (8+ años)
+   Botones grandes, textos claros, colores alegres.
+   ============================================================ */
+
+:root {
+    --create: #6f42c1;      /* morado */
+    --join: #0d6efd;        /* azul */
+    --start: #198754;       /* verde */
+    --accent: #ff8c1a;      /* naranja */
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Segoe UI", "Comic Sans MS", system-ui, -apple-system, sans-serif;
+    background: linear-gradient(160deg, #e8f4ff 0%, #fdf1ff 55%, #fff6e8 100%);
+}
+
+.app-container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 24px 16px 48px;
+}
+
+.app-title {
+    font-weight: 800;
+    color: #3b2f63;
+}
+
+.screen-title {
+    color: #3b2f63;
+    font-weight: 800;
+    margin-bottom: 18px;
+}
+
+.home-buttons {
+    max-width: 420px;
+}
+
+/* Botones grandes y redondeados */
+.btn-big {
+    font-size: 1.4rem;
+    font-weight: 700;
+    padding: 18px 24px;
+    border-radius: 2rem;
+    color: #fff;
+    border: none;
+    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.15);
+    transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+.btn-big:active {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15);
+}
+
+.btn-create { background: var(--create); }
+.btn-join { background: var(--join); }
+.btn-start { background: var(--start); }
+
+.form-card {
+    border: none;
+    border-radius: 1.4rem;
+    box-shadow: 0 10px 30px rgba(59, 47, 99, 0.15);
+}
+
+.code-input {
+    font-size: 2rem;
+    text-align: center;
+    letter-spacing: 0.5rem;
+    font-weight: 800;
+}
+
+/* Selector de cantidad de preguntas */
+.btn-group-rounds {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.round-option {
+    font-size: 2rem;
+    font-weight: 800;
+    padding: 14px 0;
+    border-radius: 1.2rem;
+    border: 3px solid #cfc3e8;
+    background: #fff;
+    color: #3b2f63;
+    cursor: pointer;
+}
+
+.round-option.selected {
+    background: var(--create);
+    border-color: var(--create);
+    color: #fff;
+}
+
+.back-link {
+    color: #6c757d;
+    text-decoration: none;
+}
+
+/* Sala de espera */
+.lobby-card {
+    border: none;
+    border-radius: 1.4rem;
+    box-shadow: 0 10px 30px rgba(59, 47, 99, 0.12);
+}
+
+.lobby-code {
+    font-size: 3.6rem;
+    font-weight: 900;
+    letter-spacing: 0.7rem;
+    color: var(--create);
+    background: #f1ecfb;
+    border-radius: 1.4rem;
+    padding: 10px;
+}
+
+.players-list {
+    font-size: 1.2rem;
+}
+
+.players-list .list-group-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 8px;
+    font-size: 1.25rem;
+}
+
+.player-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--join);
+    color: #fff;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+.player-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #198754;
+    display: inline-block;
+    margin-left: auto;
+}
+
+/* Juego */
+.game-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.category-chip {
+    display: inline-block;
+    background: #ffe3bd;
+    color: #9a4a00;
+    font-weight: 700;
+    border-radius: 1rem;
+    padding: 4px 14px;
+    font-size: 0.95rem;
+}
+
+.score-pill {
+    background: #3b2f63;
+    color: #ffe08a;
+    font-size: 1.4rem;
+    font-weight: 800;
+    border-radius: 2rem;
+    padding: 8px 20px;
+}
+
+.timer-track {
+    height: 18px;
+    border-radius: 1rem;
+    background: #e9ecef;
+}
+
+.timer-track .progress-bar {
+    background: var(--accent);
+    border-radius: 1rem;
+    transition: width 0.2s linear;
+}
+
+.question-text {
+    font-size: 1.7rem;
+    font-weight: 700;
+    color: #2c2347;
+    margin: 18px 0;
+    min-height: 3.4rem;
+}
+
+/* Opciones */
+.option-btn {
+    font-size: 1.35rem;
+    font-weight: 700;
+    text-align: left;
+    padding: 16px 20px;
+    border-radius: 1.4rem;
+    border: 3px solid #cfc3e8;
+    background: #fff;
+    color: #2c2347;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    transition: background 0.1s ease, border-color 0.1s ease;
+}
+
+.option-btn:hover:not(:disabled) {
+    background: #f1ecfb;
+    border-color: var(--create);
+}
+
+.option-btn:disabled {
+    opacity: 0.75;
+    cursor: not-allowed;
+}
+
+.option-letter {
+    min-width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: var(--join);
+    color: #fff;
+    font-weight: 900;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+}
+
+.option-btn.correct {
+    background: #d4edda;
+    border-color: #198754;
+}
+
+.option-btn.wrong {
+    background: #f8d7da;
+    border-color: #dc3545;
+}
+
+.option-btn.chosen-me {
+    outline: 5px solid #ffd166;
+}
+
+/* Resultado de ronda */
+.result-title {
+    font-size: 2.6rem;
+    font-weight: 900;
+    margin: 10px 0;
+}
+
+.result-title.win { color: #198754; }
+.result-title.lose { color: #dc3545; }
+
+/* Ranking */
+.ranking-list {
+    font-size: 1.3rem;
+    border-radius: 1.4rem;
+}
+
+.ranking-list .list-group-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 18px;
+    font-size: 1.35rem;
+}
+
+.rank-badge {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #e9ecef;
+    font-weight: 900;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+}
+
+.rank-badge.rank-1 { background: #ffd700; }
+.rank-badge.rank-2 { background: #c0c0c0; }
+.rank-badge.rank-3 { background: #cd7f32; }
+
+@media (max-width: 480px) {
+    .lobby-code { font-size: 2.6rem; }
+    .question-text { font-size: 1.35rem; }
+}
