@@ -25,7 +25,7 @@ public class GameSession {
     /** Identificador corto y legible de la partida (lo teclean los jugadores). */
     public final String gameId;
 
-    /** Cantidad de preguntas de la partida: 5, 10 o 15. */
+    /** Cantidad de preguntas (por jugador) de la partida: 5, 10, 15 o 25. */
     public final int totalRounds;
 
     /** Modalidad de juego: ONLINE (cada quien en su dispositivo) o LOCAL (misma pantalla). */

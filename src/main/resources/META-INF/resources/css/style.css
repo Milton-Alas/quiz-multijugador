@@ -115,7 +115,7 @@ body {
     margin-top: 8px;
 }
 
-.btn-group-rounds { grid-template-columns: repeat(3, 1fr); }
+.btn-group-rounds { grid-template-columns: repeat(4, 1fr); }
 .btn-group-mode { grid-template-columns: 1fr 1fr; }
 
 .round-option {
@@ -468,6 +468,7 @@ body {
 
 @media (max-width: 520px) {
     .btn-group-mode { grid-template-columns: 1fr; }
+    .btn-group-rounds { grid-template-columns: repeat(2, 1fr); }
     .app-title { font-size: 2.1rem; }
     .question-text { font-size: 1.3rem; }
     .lobby-code { font-size: 2.6rem; }

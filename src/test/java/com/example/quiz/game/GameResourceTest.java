@@ -48,6 +48,17 @@ class GameResourceTest {
     }
 
     @Test
+    void createGameSupportsTwentyFiveQuestionsPerPlayer() {
+        // La opción de 25 preguntas por jugador debe aceptarse
+        given().contentType(ContentType.JSON)
+                .body("{\"totalRounds\": 25}")
+                .when().post("/api/games")
+                .then().statusCode(201)
+                .body("totalRounds", equalTo(25))
+                .body("mode", equalTo("ONLINE"));
+    }
+
+    @Test
     void createGameRejectsInvalidOrMissingTotalRounds() {
         given().contentType(ContentType.JSON)
                 .body("{\"totalRounds\": 7}")

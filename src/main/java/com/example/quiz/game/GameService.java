@@ -44,8 +44,8 @@ import java.util.concurrent.ThreadLocalRandom;
 @ApplicationScoped
 public class GameService {
 
-    /** Cantidades de preguntas permitidas por partida. */
-    public static final List<Integer> ALLOWED_TOTAL_ROUNDS = List.of(5, 10, 15);
+    /** Cantidades de preguntas (por jugador) permitidas por partida. */
+    public static final List<Integer> ALLOWED_TOTAL_ROUNDS = List.of(5, 10, 15, 25);
 
     /** Longitud máxima del apodo. */
     public static final int MAX_NICKNAME_LENGTH = 20;
@@ -107,7 +107,7 @@ public class GameService {
     /**
      * Crea una partida nueva en estado LOBBY (modalidad ONLINE por defecto).
      *
-     * @param totalRounds cantidad de preguntas: debe ser 5, 10 o 15
+     * @param totalRounds cantidad de preguntas por jugador: 5, 10, 15 o 25
      * @return la sesión creada
      * @throws IllegalArgumentException si totalRounds no está permitido
      */

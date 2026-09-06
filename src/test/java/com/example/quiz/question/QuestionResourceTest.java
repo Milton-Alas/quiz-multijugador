@@ -17,16 +17,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class QuestionResourceTest {
 
     @Test
-    void categoriesEndpointReturnsTheEightInitialCategories() {
+    void categoriesEndpointReturnsAllNineCategories() {
         List<String> categories = given()
                 .when().get("/api/questions/categories")
                 .then().statusCode(200)
                 .extract().jsonPath().getList("$", String.class);
 
-        assertEquals(8, categories.size());
+        assertEquals(9, categories.size());
         assertTrue(categories.containsAll(List.of(
                 "FÚTBOL", "MATEMÁTICAS", "CIENCIA", "HISTORIA",
-                "CULTURA GENERAL", "GEOGRAFÍA", "ANIMALES", "TECNOLOGÍA")));
+                "CULTURA GENERAL", "GEOGRAFÍA", "ANIMALES", "TECNOLOGÍA", "PELÍCULAS")));
     }
 
     @Test
