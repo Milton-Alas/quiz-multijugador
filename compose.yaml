@@ -1,0 +1,47 @@
+# =============================================================
+# Quiz Multijugador — Docker Compose
+# Servicios:
+#   db  : PostgreSQL con volumen persistente (solo preguntas)
+#   app : aplicación Quarkus (FASE 1: aún no consume la BD)
+#
+# El estado de las partidas NO se persiste: vive en memoria de la app.
+# =============================================================
+
+name: quiz-multijugador
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: quiz-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: quiz
+      POSTGRES_PASSWORD: quiz
+      POSTGRES_DB: quiz
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quiz -d quiz"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: quiz-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Estas variables se activan en la FASE 2, cuando la app use la BD.
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://db:5432/quiz
+      QUARKUS_DATASOURCE_USERNAME: quiz
+      QUARKUS_DATASOURCE_PASSWORD: quiz
+    ports:
+      - "8080:8080"
+
+volumes:
+  db-data:
