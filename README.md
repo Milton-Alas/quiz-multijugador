@@ -8,7 +8,8 @@ frontend sencillo (**HTML + CSS + JavaScript vanilla + Bootstrap**) sin framewor
 
 ## ✨ Reglas del juego (MVP)
 
-- Un jugador **crea** una partida (5, 10 o 15 preguntas) y comparte el **código de sala**; los demás se **unen** con ese código y su apodo.
+- Un jugador **crea** una partida (5, 10, 15 o **25** preguntas por jugador) y comparte el **código de sala**; los demás se **unen** con ese código y su apodo.
+- Categorías: **FÚTBOL** (con historia del fútbol), **MATEMÁTICAS**, **CIENCIA**, **HISTORIA**, **CULTURA GENERAL**, **GEOGRAFÍA**, **ANIMALES**, **TECNOLOGÍA** y **PELÍCULAS** (Disney infantiles y películas famosas).
 - Cada ronda el servidor elige **una categoría al azar** entre las disponibles y **una pregunta al azar** dentro de ella.
 - **Nunca se repite una pregunta dentro de la misma partida.** Si una categoría se queda sin preguntas se descarta temporalmente.
 - Cada pregunta dura **15 segundos**; **el servidor es la autoridad del tiempo** (el contador del navegador es solo informativo).
@@ -110,7 +111,7 @@ y dobles de temporizador/reloj para no esperar 15 segundos reales.
 | Misma pantalla | `LocalTurnModeTest` | cada ronda la juegan todos por turnos, rechazo fuera de turno, calificación inmediata, timeout, regresión ONLINE |
 | WebSocket | `SessionRegistryTest` | envío asíncrono, sesiones rotas/cerradas sin bloquear el servidor |
 | REST | `GameResourceTest` | endpoints HTTP, modos ONLINE/LOCAL, errores 400/404, sin fuga de `correctOption` |
-| BD | `QuestionRepositoryTest` | migraciones Flyway (V1–V5), 25 preguntas por categoría, EASY/MEDIUM/HARD, sin textos duplicados |
+| BD | `QuestionRepositoryTest` | migraciones Flyway (V1–V6), 9 categorías (PELÍCULAS con 25 y el resto con 35), EASY/MEDIUM/HARD, sin textos duplicados |
 
 ---
 
@@ -148,6 +149,7 @@ quiz-multijugador/
 │   ├── db/migration/V3__add_more_questions.sql   # 10 preguntas EASY por categoría
 │   ├── db/migration/V4__add_medium_questions.sql # +10 MEDIUM por categoría (Fútbol = historia)
 │   ├── db/migration/V5__add_hard_questions.sql   # +5 HARD por categoría (Fútbol = historia)
+│   ├── db/migration/V6__movies_and_more_questions.sql # PELÍCULAS (25) + 10 por categoría
 │   └── META-INF/resources/       # frontend (index.html, css/, js/)
 └── src/test/java/...             # tests unitarios + @QuarkusTest
 ```
