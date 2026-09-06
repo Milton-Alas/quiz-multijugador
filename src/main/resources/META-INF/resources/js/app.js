@@ -6,16 +6,17 @@
    Dos modos:
    - ONLINE: cada quien en su dispositivo; todos responden la misma
      pregunta a la vez.
-   - LOCAL:  los 3 en la misma pantalla; cada pregunta la responde un
-     jugador por turnos. El servidor anuncia el turno (NEW_QUESTION con
-     "player") y califica al instante al responder.
+   - LOCAL:  los 3 en la misma pantalla. Cada "ronda" (ciclo) la juegan
+     TODOS por turnos y cada uno responde SU PROPIA pregunta. El sistema
+     anuncia el turno (NEW_QUESTION con "player", "cycle" y "turnOrder")
+     y califica al instante al responder.
    ============================================================ */
 (function () {
     'use strict';
 
-    var RESULT_DISPLAY_MS = 3800; // tiempo que se muestra el resultado de la ronda
+    var RESULT_DISPLAY_MS = 3800; // tiempo que se muestra el resultado del turno
     var NICK_STORAGE = 'quiz.nickname';
-    var PALETTE = ['#e63946', '#457b9d', '#2a9d8f', '#e9c46a', '#9b5de5'];
+    var PALETTE = ['#ff5a5f', '#1e90ff', '#12b76a', '#ff9f1c', '#9b5de5'];
 
     var state = {
         gameId: null,
@@ -151,7 +152,7 @@
                 state.totalRounds = payload.totalRounds;
                 show('play');
                 applyModeUI();
-                updateScoreHeader();
+                renderScoreArea();
                 break;
             case 'NEW_QUESTION':
                 if (Date.now() < state.resultUntil) {
@@ -164,7 +165,7 @@
                 updateAnswered(payload);
                 break;
             case 'QUESTION_RESULT':
-                showRoundResult(payload);
+                showTurnResult(payload);
                 break;
             case 'GAME_FINISHED':
                 showFinalRanking(payload);
@@ -185,7 +186,6 @@
         $('lobby-code-box').classList.toggle('d-none', local);
         $('lobby-local-note').classList.toggle('d-none', !local);
         $('lobby-players-title').textContent = local ? 'Jugadores en esta pantalla' : 'Jugadores en la sala';
-        $('btn-start').textContent = local ? '🚀 ¡Comenzar!' : '🚀 ¡Comenzar!';
 
         var list = $('lobby-players');
         list.innerHTML = '';
@@ -196,47 +196,55 @@
                 '<span class="player-avatar" style="background:' + playerColor(player.playerId) + '">' +
                 escapeHtml(initials(player.nickname)) + '</span>' +
                 '<span class="fw-bold">' + escapeHtml(player.nickname) + '</span>' +
-                (local ? '<span class="turn-order ms-auto text-muted">Jugador ' + (index + 1) + '</span>'
+                (local ? '<span class="turn-order ms-auto">Jugador ' + (index + 1) + '</span>'
                        : '<span class="player-dot" title="Conectado"></span>');
             list.appendChild(item);
         });
     }
 
-    /* ---------- Juego: cabecera y turnos ---------- */
+    /* ---------- Juego: cabecera y jugadores visibles ---------- */
     function applyModeUI() {
         var local = isLocal();
         $('score-online').classList.toggle('d-none', local);
-        $('local-scoreboard').classList.toggle('d-none', !local);
+        $('player-strip').classList.toggle('d-none', !local);
         $('turn-banner').classList.add('d-none');
-        if (local) {
-            renderLocalScoreboard();
-        }
+        renderPlayerStrip();
     }
 
-    function updateScoreHeader() {
+    function renderScoreArea() {
         if (isLocal()) {
-            renderLocalScoreboard();
+            renderPlayerStrip();
         } else {
             $('play-score').textContent = state.myScore;
         }
     }
 
-    function renderLocalScoreboard() {
-        var box = $('local-scoreboard');
-        box.innerHTML = '';
+    /** Tarjetas de TODOS los jugadores (modo misma pantalla). */
+    function renderPlayerStrip() {
+        var strip = $('player-strip');
+        if (!isLocal()) {
+            strip.classList.add('d-none');
+            return;
+        }
+        strip.classList.remove('d-none');
+        strip.innerHTML = '';
+
+        var activeId = state.question && state.question.player
+            ? state.question.player.playerId : null;
+
         state.players.forEach(function (player, index) {
-            var chip = document.createElement('span');
-            chip.className = 'score-chip';
-            if (state.question && state.question.player &&
-                    state.question.player.playerId === player.playerId) {
-                chip.classList.add('active-turn');
-            }
-            chip.innerHTML =
-                '<span class="chip-dot" style="background:' + playerColor(player.playerId) + '">' +
-                (index + 1) + '</span>' +
-                '<span>' + escapeHtml(player.nickname) + '</span>' +
-                '<span>⭐ ' + player.score + '</span>';
-            box.appendChild(chip);
+            var card = document.createElement('div');
+            card.className = 'pcard' + (player.playerId === activeId ? ' on-turn' : '');
+            var color = playerColor(player.playerId);
+            card.style.setProperty('--turn-color', color);
+            var status = player.playerId === activeId ? '🎤 Responde' : 'espera';
+            card.innerHTML =
+                '<span class="pavatar" style="background:' + color + '">' +
+                escapeHtml(initials(player.nickname)) + '</span>' +
+                '<span class="pname">' + escapeHtml(player.nickname) + '</span>' +
+                '<span class="pscore">⭐ ' + player.score + '</span>' +
+                '<span class="pstatus">' + status + '</span>';
+            strip.appendChild(card);
         });
     }
 
@@ -251,19 +259,25 @@
         $('result-area').classList.add('d-none');
         setError('play', null);
 
-        // En modo LOCAL el sistema anuncia de quién es el turno
+        var playerCount = state.players.length || 1;
+
         if (isLocal() && q.player) {
+            // Cabecera: "Ronda (ciclo) X/N · Turno Y de P"
+            $('play-round').textContent = 'Ronda ' + (q.cycle || 1) + '/' + state.totalRounds +
+                ' · Turno ' + (q.turnOrder || 1) + ' de ' + playerCount;
+
             var color = playerColor(q.player.playerId);
             var banner = $('turn-banner');
             banner.classList.remove('d-none');
             banner.style.background = color;
-            banner.innerHTML = '🎯 ¡Turno de <b>' + escapeHtml(q.player.nickname) + '</b>! ' +
-                '<span style="font-size:0.8em;font-weight:600">Pasa el dispositivo y responde.</span>';
+            banner.innerHTML =
+                '🎯 ¡Turno de <b>' + escapeHtml(q.player.nickname) + '</b>!' +
+                '<span class="turn-sub">Pasa el dispositivo y responde tú. Los demás esperan su turno.</span>';
         } else {
+            $('play-round').textContent = 'Ronda ' + q.round + '/' + state.totalRounds;
             $('turn-banner').classList.add('d-none');
         }
 
-        $('play-round').textContent = 'Ronda ' + q.round + '/' + state.totalRounds;
         $('play-category').textContent = q.category;
         $('play-question').textContent = q.question;
 
@@ -284,8 +298,9 @@
         });
 
         $('play-answered').textContent = '';
+        renderPlayerStrip();
         startCountdown(q.timeLimitMs);
-        updateScoreHeader();
+        renderScoreArea();
     }
 
     function startCountdown(limitMs) {
@@ -302,6 +317,7 @@
             }
             text.textContent = Math.ceil(remaining / 1000);
             bar.style.width = Math.max(0, (remaining / limitMs) * 100) + '%';
+            bar.classList.toggle('low', remaining <= 5000);
         }, 100);
     }
 
@@ -332,7 +348,7 @@
             return;
         }
 
-        // En LOCAL solo se puede responder en el turno anunciado
+        // En LOCAL solo se responde en el turno anunciado
         if (isLocal() && !state.question.player) {
             return;
         }
@@ -365,8 +381,8 @@
             ' jugador(es) respondieron';
     }
 
-    /* ---------- Resultado de la ronda ---------- */
-    function showRoundResult(result) {
+    /* ---------- Resultado del turno ---------- */
+    function showTurnResult(result) {
         stopCountdown();
         $('quiz-area').classList.add('d-none');
         $('result-area').classList.remove('d-none');
@@ -376,7 +392,7 @@
         var local = isLocal();
         var row;
         if (local) {
-            row = (result.answers || [])[0] || null; // el único jugador de la ronda
+            row = (result.answers || [])[0] || null; // el único jugador del turno
         } else {
             row = result.answers.find(function (a) { return a.playerId === state.playerId; }) || null;
         }
@@ -389,7 +405,7 @@
         if (row) {
             state.myScore = row.score;
         }
-        updateScoreHeader();
+        renderScoreArea();
 
         // Colorea las opciones (verde la correcta, roja la elegida mal)
         var buttons = $('play-options').querySelectorAll('.option-btn');
@@ -461,7 +477,7 @@
             $('play-question').textContent = '⏳ Preparando la siguiente pregunta…';
             $('play-options').innerHTML = '';
             $('play-answered').textContent = '';
-            updateScoreHeader();
+            renderScoreArea();
         }
     }
 
