@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -23,7 +24,8 @@ class GameServiceTest {
 
     @BeforeEach
     void setUp() {
-        gameService = new GameService();
+        // El repositorio real no se usa en estas operaciones: fake vacío.
+        gameService = new GameService(new FakeQuestionRepository());
     }
 
     // ---------- Creación de partidas ----------
@@ -74,10 +76,10 @@ class GameServiceTest {
         Player carla = gameService.joinGame(session.gameId, "Carla");
 
         assertEquals(3, session.players.size());
-        assertEquals(java.util.List.of("Ana", "Beto", "Carla"),
+        assertEquals(List.of("Ana", "Beto", "Carla"),
                 session.players.stream().map(p -> p.nickname).toList());
 
-        for (Player p : java.util.List.of(ana, beto, carla)) {
+        for (Player p : List.of(ana, beto, carla)) {
             assertNotNull(p.playerId);
             assertEquals(0, p.score);
             assertTrue(p.connected);

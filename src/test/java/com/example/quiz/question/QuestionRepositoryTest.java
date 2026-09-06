@@ -5,13 +5,16 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Tests de la FASE 2 sobre el repositorio Panache, usando H2 en memoria
+ * Tests de la FASE 2/4 sobre el repositorio Panache, usando H2 en memoria
  * con las migraciones Flyway aplicadas (V1 + V2).
  */
 @QuarkusTest
@@ -56,5 +59,23 @@ class QuestionRepositoryTest {
 
         assertEquals(expected.size(), categories.size());
         assertTrue(categories.containsAll(expected), "deben existir las 8 categorías iniciales: " + categories);
+    }
+
+    @Test
+    void availableIdsGroupedByCategoryExcludesUsedQuestions() {
+        Map<String, List<Long>> all = questionRepository.findAvailableQuestionIdsGroupedByCategory(Set.of());
+
+        // 8 categorías, 1 pregunta cada una
+        assertEquals(8, all.size());
+        assertEquals(8, all.values().stream().mapToInt(List::size).sum());
+
+        Long usedId = all.get("FÚTBOL").get(0);
+        Map<String, List<Long>> withoutUsed =
+                questionRepository.findAvailableQuestionIdsGroupedByCategory(Set.of(usedId));
+
+        // Al excluir la única pregunta de FÚTBOL, esa categoría desaparece
+        assertEquals(7, withoutUsed.values().stream().mapToInt(List::size).sum());
+        assertFalse(withoutUsed.containsKey("FÚTBOL"),
+                "una categoría agotada debe quedar fuera del mapa de disponibles");
     }
 }

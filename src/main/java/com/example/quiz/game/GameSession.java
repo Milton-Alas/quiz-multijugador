@@ -1,7 +1,13 @@
 package com.example.quiz.game;
 
+import com.example.quiz.question.Question;
+
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Estado completo de una partida activa, mantenido en memoria.
@@ -10,9 +16,9 @@ import java.util.List;
  * preguntas). Un {@code Map<String, GameSession>} en {@link GameService}
  * es el único dueño del estado; cuando la partida finaliza se elimina.
  *
- * <p>Campos añadidos en fases posteriores (no declarados aún para no dejar
- * código muerto): currentQuestion, usedQuestionIds, selectedCategory,
- * questionStartTime y respuestas por ronda.
+ * <p>FASE 3: identidad, configuración y jugadores. FASE 4: selección
+ * aleatoria. FASE 6: pregunta y respuestas de la ronda. FASE 7: control del
+ * tiempo por pregunta (inicio, temporizador y tiempos de respuesta).
  */
 public class GameSession {
 
@@ -30,6 +36,37 @@ public class GameSession {
 
     /** Ronda en curso (0 = aún no ha empezado; 1..totalRounds en juego). */
     public int currentRound = 0;
+
+    /** Ids de preguntas ya usadas en esta partida: nunca pueden repetirse. */
+    public final Set<Long> usedQuestionIds = new HashSet<>();
+
+    /** Categoría elegida al azar para la ronda en curso. */
+    public String selectedCategory;
+
+    /** Id de la pregunta de la ronda en curso. */
+    public Long currentQuestionId;
+
+    /**
+     * Pregunta de la ronda en curso (cargada por el GameService). Vive solo
+     * en el servidor: su {@code correctOption} jamás viaja en un evento.
+     */
+    public Question currentQuestion;
+
+    /** Respuestas de la ronda en curso: playerId -> opción elegida ("A".."D"). */
+    public final Map<String, String> currentRoundAnswers = new HashMap<>();
+
+    /** Instante (reloj del servidor) en que se emitió la pregunta actual. */
+    public long questionStartTimeMs;
+
+    /** Identificador del temporizador de 15 s de la ronda actual (0 = ninguno). */
+    public long roundTimerHandle;
+
+    /** Instante (reloj del servidor) en que respondió cada jugador. */
+    public final Map<String, Long> answerTimesMs = new HashMap<>();
+
+    /** true si la partida debe terminar antes de totalRounds porque no quedan
+     *  preguntas únicas disponibles (se informa a los jugadores). */
+    public boolean insufficientQuestions;
 
     public GameSession(String gameId, int totalRounds) {
         this.gameId = gameId;

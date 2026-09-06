@@ -44,6 +44,12 @@
             <artifactId>quarkus-rest-jackson</artifactId>
         </dependency>
 
+        <!-- WebSockets (API clásica jakarta.websocket: @ServerEndpoint) -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-websockets</artifactId>
+        </dependency>
+
         <!-- Persistencia: Hibernate ORM con Panache -->
         <dependency>
             <groupId>io.quarkus</groupId>
