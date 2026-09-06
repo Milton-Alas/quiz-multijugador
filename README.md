@@ -111,7 +111,7 @@ y dobles de temporizador/reloj para no esperar 15 segundos reales.
 | Misma pantalla | `LocalTurnModeTest` | cada ronda la juegan todos por turnos, rechazo fuera de turno, calificación inmediata, timeout, regresión ONLINE |
 | WebSocket | `SessionRegistryTest` | envío asíncrono, sesiones rotas/cerradas sin bloquear el servidor |
 | REST | `GameResourceTest` | endpoints HTTP, modos ONLINE/LOCAL, errores 400/404, sin fuga de `correctOption` |
-| BD | `QuestionRepositoryTest` | migraciones Flyway (V1–V6), 9 categorías (PELÍCULAS con 25 y el resto con 35), EASY/MEDIUM/HARD, sin textos duplicados |
+| BD | `QuestionRepositoryTest` | migraciones Flyway (V1–V7), 501 preguntas en 9 categorías (PELÍCULAS 70 y el resto 52–55), EASY/MEDIUM/HARD, sin textos duplicados |
 
 ---
 
@@ -150,6 +150,7 @@ quiz-multijugador/
 │   ├── db/migration/V4__add_medium_questions.sql # +10 MEDIUM por categoría (Fútbol = historia)
 │   ├── db/migration/V5__add_hard_questions.sql   # +5 HARD por categoría (Fútbol = historia)
 │   ├── db/migration/V6__movies_and_more_questions.sql # PELÍCULAS (25) + 10 por categoría
+│   ├── db/migration/V7__add_more_medium.sql   # +196 preguntas (aportadas + 90 MEDIUM)
 │   └── META-INF/resources/       # frontend (index.html, css/, js/)
 └── src/test/java/...             # tests unitarios + @QuarkusTest
 ```
