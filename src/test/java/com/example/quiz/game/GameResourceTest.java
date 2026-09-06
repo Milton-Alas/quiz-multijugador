@@ -63,6 +63,38 @@ class GameResourceTest {
     }
 
     @Test
+    void createGameSupportsLocalAndOnlineModes() {
+        // Modo LOCAL explícito
+        given().contentType(ContentType.JSON)
+                .body("{\"totalRounds\": 5, \"mode\": \"LOCAL\"}")
+                .when().post("/api/games")
+                .then().statusCode(201)
+                .body("status", equalTo("LOBBY"))
+                .body("mode", equalTo("LOCAL"));
+
+        // Sin modo: ONLINE por defecto
+        given().contentType(ContentType.JSON)
+                .body("{\"totalRounds\": 5}")
+                .when().post("/api/games")
+                .then().statusCode(201)
+                .body("mode", equalTo("ONLINE"));
+
+        // Modo explícito ONLINE (no distingue mayúsculas)
+        given().contentType(ContentType.JSON)
+                .body("{\"totalRounds\": 5, \"mode\": \"online\"}")
+                .when().post("/api/games")
+                .then().statusCode(201)
+                .body("mode", equalTo("ONLINE"));
+
+        // Modo inválido -> 400
+        given().contentType(ContentType.JSON)
+                .body("{\"totalRounds\": 5, \"mode\": \"TURNOS\"}")
+                .when().post("/api/games")
+                .then().statusCode(400)
+                .body("message", containsString("Modo inválido"));
+    }
+
+    @Test
     void joinPlayerAddsThemToTheLobby() {
         String gameId = createGame(5);
 

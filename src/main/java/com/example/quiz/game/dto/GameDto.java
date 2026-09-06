@@ -1,5 +1,6 @@
 package com.example.quiz.game.dto;
 
+import com.example.quiz.game.GameMode;
 import com.example.quiz.game.GameStatus;
 
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.List;
  */
 public record GameDto(String gameId,
                       GameStatus status,
+                      GameMode mode,
                       int totalRounds,
                       int currentRound,
                       boolean insufficientQuestions,

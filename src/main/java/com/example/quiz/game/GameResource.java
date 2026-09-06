@@ -34,14 +34,14 @@ public class GameResource {
         this.gameService = gameService;
     }
 
-    /** Crea una partida. Cuerpo: {"totalRounds": 5|10|15}. */
+    /** Crea una partida. Cuerpo: {"totalRounds": 5|10|15, "mode"?: "ONLINE"|"LOCAL"}. */
     @POST
     public Response createGame(CreateGameRequest request) {
         if (request == null || request.totalRounds() == null) {
             throw new IllegalArgumentException(
                     "La cantidad de preguntas (totalRounds) es obligatoria");
         }
-        GameSession session = gameService.createGame(request.totalRounds());
+        GameSession session = gameService.createGame(request.totalRounds(), request.mode());
         return Response.status(Response.Status.CREATED).entity(toGameDto(session)).build();
     }
 
@@ -64,8 +64,8 @@ public class GameResource {
 
     private GameDto toGameDto(GameSession session) {
         List<PlayerDto> players = session.players.stream().map(this::toPlayerDto).toList();
-        return new GameDto(session.gameId, session.status, session.totalRounds,
-                session.currentRound, session.insufficientQuestions, players);
+        return new GameDto(session.gameId, session.status, session.mode,
+                session.totalRounds, session.currentRound, session.insufficientQuestions, players);
     }
 
     private PlayerDto toPlayerDto(Player player) {

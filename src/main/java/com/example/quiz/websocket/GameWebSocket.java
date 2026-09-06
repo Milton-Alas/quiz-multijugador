@@ -21,8 +21,9 @@ import java.util.Map;
  * Endpoint WebSocket del juego: {@code /ws/game}.
  *
  * <p>Mensajes entrantes (JSON plano): JOIN (gameId, playerId), START_GAME y
- * ANSWER (option). El jugador debe hacer JOIN antes de poder iniciar o
- * responder. Los eventos de salida usan el envoltorio estándar
+ * ANSWER (option; en modo LOCAL además playerId del jugador que responde su
+ * turno). El jugador debe hacer JOIN antes de poder iniciar o responder. Los
+ * eventos de salida usan el envoltorio estándar
  * {"type", "gameId", "payload"} y los emite el GameService vía broadcaster.
  *
  * <p>Hilos: los handlers de Undertow corren en el event loop de Vert.x, pero
@@ -103,7 +104,11 @@ public class GameWebSocket {
     private void handleAnswer(Session session, JsonNode message) {
         SessionRegistry.Binding binding = requireBinding(session);
         String option = message.path("option").asText(null);
-        gameService.submitAnswer(binding.gameId(), binding.playerId(), option);
+        // En modo LOCAL (misma pantalla) el mensaje indica qué jugador
+        // responde; en ONLINE siempre responde el enlazado a la sesión.
+        String declared = message.path("playerId").asText("");
+        String playerId = (declared == null || declared.isBlank()) ? binding.playerId() : declared;
+        gameService.submitAnswer(binding.gameId(), binding.playerId(), playerId, option);
     }
 
     @OnClose

@@ -28,6 +28,9 @@ public class GameSession {
     /** Cantidad de preguntas de la partida: 5, 10 o 15. */
     public final int totalRounds;
 
+    /** Modalidad de juego: ONLINE (cada quien en su dispositivo) o LOCAL (misma pantalla). */
+    public final GameMode mode;
+
     /** Jugadores en orden de llegada. */
     public final List<Player> players = new ArrayList<>();
 
@@ -69,7 +72,12 @@ public class GameSession {
     public boolean insufficientQuestions;
 
     public GameSession(String gameId, int totalRounds) {
+        this(gameId, totalRounds, GameMode.ONLINE);
+    }
+
+    public GameSession(String gameId, int totalRounds, GameMode mode) {
         this.gameId = gameId;
         this.totalRounds = totalRounds;
+        this.mode = mode == null ? GameMode.ONLINE : mode;
     }
 }

@@ -8,6 +8,7 @@ import jakarta.inject.Inject;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -23,7 +24,9 @@ import java.util.concurrent.ThreadLocalRandom;
  * <p>FASE 3: crear partidas y unir jugadores. FASE 4: selección aleatoria de
  * preguntas sin repetición. FASE 6: orquestación de rondas por WebSocket.
  * FASE 7: el servidor es la autoridad del tiempo (cierre automático a los
- * 15 s, rechazo de respuestas tardías) y de la puntuación.
+ * 15 s, rechazo de respuestas tardías) y de la puntuación. EXTENSIÓN LOCAL:
+ * modalidad de misma pantalla por turnos ({@link GameMode#LOCAL}), donde
+ * cada ronda la juega un solo jugador y se califica al instante.
  *
  * <p>Puntuación (FASE 7, documentada): respuesta correcta = 100 puntos;
  * bonus por rapidez = redondeo de {@code 20 × remainingMs / 15000} (de 0 a
@@ -102,19 +105,37 @@ public class GameService {
     // ====================== Sala de espera (FASE 3) ======================
 
     /**
-     * Crea una partida nueva en estado LOBBY.
+     * Crea una partida nueva en estado LOBBY (modalidad ONLINE por defecto).
      *
      * @param totalRounds cantidad de preguntas: debe ser 5, 10 o 15
      * @return la sesión creada
      * @throws IllegalArgumentException si totalRounds no está permitido
      */
     public GameSession createGame(int totalRounds) {
+        return createGame(totalRounds, GameMode.ONLINE);
+    }
+
+    /**
+     * Crea una partida nueva indicando la modalidad como texto.
+     *
+     * @param mode "ONLINE" (cada quien en su dispositivo) o "LOCAL" (misma
+     *             pantalla, por turnos); {@code null} = ONLINE
+     */
+    public GameSession createGame(int totalRounds, String mode) {
+        return createGame(totalRounds, GameMode.parse(mode));
+    }
+
+    /**
+     * Crea una partida nueva en estado LOBBY con la modalidad indicada.
+     */
+    public GameSession createGame(int totalRounds, GameMode mode) {
         if (!ALLOWED_TOTAL_ROUNDS.contains(totalRounds)) {
             throw new IllegalArgumentException(
                     "Cantidad de preguntas inválida (" + totalRounds
                             + "). Permitidas: " + ALLOWED_TOTAL_ROUNDS);
         }
-        GameSession session = new GameSession(generateUniqueGameId(), totalRounds);
+        GameSession session = new GameSession(generateUniqueGameId(), totalRounds,
+                mode == null ? GameMode.ONLINE : mode);
         games.put(session.gameId, session);
         return session;
     }
@@ -229,10 +250,21 @@ public class GameService {
             }
             findPlayer(session, playerId); // solo jugadores de la partida pueden iniciarla
             session.status = GameStatus.IN_PROGRESS;
-            broadcast(session, GameEvents.GAME_STARTED,
-                    Map.of("totalRounds", session.totalRounds, "players", playersPayload(session)));
+            broadcast(session, GameEvents.GAME_STARTED, Map.of(
+                    "totalRounds", session.totalRounds,
+                    "mode", session.mode.name(),
+                    "players", playersPayload(session)));
             beginNextRound(session);
         }
+    }
+
+    /**
+     * Registra la respuesta de un jugador a la pregunta de la ronda en curso.
+     * Versión usada por los tests: en modo ONLINE el jugador es quien responde;
+     * en modo LOCAL debe coincidir con el jugador al que le toca el turno.
+     */
+    public void submitAnswer(String gameId, String playerId, String option) {
+        submitAnswer(gameId, playerId, playerId, option);
     }
 
     /**
@@ -243,43 +275,92 @@ public class GameService {
      * Cuando todos los jugadores conectados han respondido, la ronda se cierra
      * automáticamente (resultado y, si quedan rondas, siguiente pregunta).
      *
+     * <p>Identidad del que responde:
+     * <ul>
+     *   <li><b>ONLINE</b>: siempre el jugador enlazado a la sesión
+     *       ({@code boundPlayerId}); el campo {@code declaredPlayerId} se ignora.</li>
+     *   <li><b>LOCAL</b> (misma pantalla): se usa {@code declaredPlayerId} y el
+     *       servidor exige que sea el jugador al que le toca el turno. Al
+     *       responder, la ronda se cierra y se califica al instante.</li>
+     * </ul>
+     *
      * @param option opción elegida: "A", "B", "C" o "D"
      * @throws GameNotFoundException si la partida no existe
      * @throws IllegalArgumentException si no hay pregunta activa, el jugador
-     *                                  no está en la partida, la opción es inválida
-     *                                  o el tiempo de la pregunta terminó
+     *                                  no está en la partida/no es su turno, la
+     *                                  opción es inválida o el tiempo terminó
      */
-    public void submitAnswer(String gameId, String playerId, String option) {
+    public void submitAnswer(String gameId, String boundPlayerId, String declaredPlayerId, String option) {
         GameSession session = requireGame(gameId);
         synchronized (session) {
-            if (session.status != GameStatus.IN_PROGRESS || session.currentQuestion == null) {
-                throw new IllegalArgumentException("No hay una pregunta activa en este momento");
-            }
-            Player player = findPlayer(session, playerId);
-            if (option == null || !option.matches("[A-D]")) {
-                throw new IllegalArgumentException("Opción inválida: '" + option + "' (se espera A, B, C o D)");
-            }
-            if (player.answeredCurrentQuestion) {
-                return; // respuestas duplicadas se ignoran
-            }
-            long nowMs = timeProvider.currentTimeMillis();
-            if (nowMs - session.questionStartTimeMs >= QUESTION_TIME_LIMIT_MS) {
-                throw new IllegalArgumentException("El tiempo de esta pregunta terminó");
-            }
-            player.answeredCurrentQuestion = true;
-            session.currentRoundAnswers.put(playerId, option);
-            session.answerTimesMs.put(playerId, nowMs);
-
-            broadcast(session, GameEvents.PLAYER_ANSWERED, Map.of(
-                    "playerId", player.playerId,
-                    "nickname", player.nickname,
-                    "answeredCount", countAnswered(session),
-                    "totalPlayers", countConnected(session)));
-
-            if (countConnected(session) > 0 && countAnswered(session) == countConnected(session)) {
-                closeRoundAndAdvance(session);
+            if (session.mode == GameMode.LOCAL) {
+                submitTurnAnswerLocked(session, declaredPlayerId, option);
+            } else {
+                submitOnlineAnswerLocked(session, boundPlayerId, option);
             }
         }
+    }
+
+    /** Respuesta del modo ONLINE: vale la de cualquier jugador conectado. */
+    private void submitOnlineAnswerLocked(GameSession session, String playerId, String option) {
+        if (session.status != GameStatus.IN_PROGRESS || session.currentQuestion == null) {
+            throw new IllegalArgumentException("No hay una pregunta activa en este momento");
+        }
+        Player player = findPlayer(session, playerId);
+        boolean recorded = recordAnswer(session, player, option);
+        if (recorded && countConnected(session) > 0
+                && countAnswered(session) == countConnected(session)) {
+            closeRoundAndAdvance(session);
+        }
+    }
+
+    /** Respuesta del modo LOCAL: solo vale la del jugador al que le toca. */
+    private void submitTurnAnswerLocked(GameSession session, String playerId, String option) {
+        if (session.status != GameStatus.IN_PROGRESS || session.currentQuestion == null) {
+            throw new IllegalArgumentException("No hay una pregunta activa en este momento");
+        }
+        Player turn = currentTurnPlayer(session);
+        if (turn == null) {
+            throw new IllegalStateException("La partida no tiene jugadores para repartir turnos");
+        }
+        if (playerId == null || !turn.playerId.equals(playerId)) {
+            throw new IllegalArgumentException(
+                    "No es el turno de ese jugador: ahora le toca a " + turn.nickname);
+        }
+        if (recordAnswer(session, turn, option)) {
+            // En modo LOCAL cada ronda la juega un solo jugador: al responder,
+            // la ronda se cierra y se califica al instante (correcta/incorrecta).
+            closeRoundAndAdvance(session);
+        }
+    }
+
+    /**
+     * Valida la opción y el tiempo y registra la respuesta del jugador
+     * (marca, guarda, emite PLAYER_ANSWERED). Devuelve false si el jugador
+     * ya había respondido (duplicado que se ignora).
+     */
+    private boolean recordAnswer(GameSession session, Player player, String option) {
+        if (option == null || !option.matches("[A-D]")) {
+            throw new IllegalArgumentException(
+                    "Opción inválida: '" + option + "' (se espera A, B, C o D)");
+        }
+        if (player.answeredCurrentQuestion) {
+            return false; // respuestas duplicadas se ignoran
+        }
+        long nowMs = timeProvider.currentTimeMillis();
+        if (nowMs - session.questionStartTimeMs >= QUESTION_TIME_LIMIT_MS) {
+            throw new IllegalArgumentException("El tiempo de esta pregunta terminó");
+        }
+        player.answeredCurrentQuestion = true;
+        session.currentRoundAnswers.put(player.playerId, option);
+        session.answerTimesMs.put(player.playerId, nowMs);
+
+        broadcast(session, GameEvents.PLAYER_ANSWERED, Map.of(
+                "playerId", player.playerId,
+                "nickname", player.nickname,
+                "answeredCount", countAnswered(session),
+                "totalPlayers", countConnected(session)));
+        return true;
     }
 
     /**
@@ -395,16 +476,24 @@ public class GameService {
         session.players.forEach(p -> p.answeredCurrentQuestion = false);
         session.questionStartTimeMs = timeProvider.currentTimeMillis();
 
-        broadcast(session, GameEvents.NEW_QUESTION, Map.of(
-                "round", selected.round(),
-                "category", selected.category(),
-                "questionId", selected.questionId(),
-                "question", question.question,
-                "optionA", question.optionA,
-                "optionB", question.optionB,
-                "optionC", question.optionC,
-                "optionD", question.optionD,
-                "timeLimitMs", QUESTION_TIME_LIMIT_MS));
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("round", selected.round());
+        payload.put("category", selected.category());
+        payload.put("questionId", selected.questionId());
+        payload.put("question", question.question);
+        payload.put("optionA", question.optionA);
+        payload.put("optionB", question.optionB);
+        payload.put("optionC", question.optionC);
+        payload.put("optionD", question.optionD);
+        payload.put("timeLimitMs", QUESTION_TIME_LIMIT_MS);
+        if (session.mode == GameMode.LOCAL) {
+            // En misma pantalla el sistema anuncia de quién es el turno.
+            Player turn = currentTurnPlayer(session);
+            if (turn != null) {
+                payload.put("player", Map.of("playerId", turn.playerId, "nickname", turn.nickname));
+            }
+        }
+        broadcast(session, GameEvents.NEW_QUESTION, payload);
 
         scheduleRoundTimer(session, session.questionStartTimeMs);
     }
@@ -435,6 +524,10 @@ public class GameService {
      * Cierra la ronda en curso: cancela el temporizador, calcula aciertos y
      * puntos (con bonus por rapidez), emite QUESTION_RESULT y decide entre la
      * siguiente ronda o el fin de la partida. Asume el lock de session.
+     *
+     * <p>En modo ONLINE se califica a todos los jugadores de la ronda; en
+     * modo LOCAL solo al jugador del turno (los demás no jugaron la ronda y
+     * no deben aparecer como "sin respuesta").
      */
     private void closeRoundAndAdvance(GameSession session) {
         cancelRoundTimer(session);
@@ -442,8 +535,16 @@ public class GameService {
         Question question = session.currentQuestion;
         int round = session.currentRound;
 
+        List<Player> toGrade;
+        if (session.mode == GameMode.LOCAL) {
+            Player turn = currentTurnPlayer(session);
+            toGrade = turn == null ? List.of() : List.of(turn);
+        } else {
+            toGrade = session.players;
+        }
+
         List<Map<String, Object>> answers = new ArrayList<>();
-        for (Player player : session.players) {
+        for (Player player : toGrade) {
             String selected = session.currentRoundAnswers.get(player.playerId);
             boolean correct = selected != null && selected.equals(question.correctOption);
             int points = correct ? pointsFor(player, session) : 0;
@@ -562,6 +663,19 @@ public class GameService {
 
     private long countAnswered(GameSession session) {
         return session.players.stream().filter(p -> p.answeredCurrentQuestion).count();
+    }
+
+    /**
+     * Jugador al que le toca responder la ronda actual (solo modo LOCAL):
+     * rotación en el orden de la sala — ronda 1 la responde el jugador[0],
+     * ronda 2 el jugador[1], etc. En ONLINE devuelve {@code null}.
+     */
+    private Player currentTurnPlayer(GameSession session) {
+        if (session.mode != GameMode.LOCAL || session.players.isEmpty()) {
+            return null;
+        }
+        int index = (session.currentRound - 1) % session.players.size();
+        return session.players.get(index);
     }
 
     private List<PlayerDto> playersPayload(GameSession session) {
