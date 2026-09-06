@@ -18,6 +18,21 @@ frontend sencillo (**HTML + CSS + JavaScript vanilla + Bootstrap**) sin framewor
   - Incorrecta o sin respuesta: **0 puntos**. No hay penalización.
 - Al final se muestra el **ranking** ordenado por puntos.
 
+### 🎮 Dos modos de juego
+
+Al crear una partida se elige la modalidad (`mode`, ver [API](#-api-rest)):
+
+- **`ONLINE` (En línea):** cada jugador usa su propio dispositivo; todos
+  responden la **misma pregunta a la vez** y el resultado de la ronda llega
+  cuando todos respondieron o se acaba el tiempo.
+- **`LOCAL` (Misma pantalla):** los 3 jugadores comparten **una sola
+  pantalla** por turnos. El sistema **anuncia de quién es el turno** en cada
+  pregunta (evento `NEW_QUESTION` con el campo `player`) y rota en el orden
+  de la sala: ronda 1 → jugador 1, ronda 2 → jugador 2, etc. Al seleccionar
+  una respuesta se envía y se **califica al instante** (correcta/incorrecta
+  con puntos y bonus); solo puede responder el jugador al que le toca.
+  Pasan el dispositivo cuando el sistema diga el turno.
+
 > 💡 Si la base de datos tiene menos preguntas únicas que las rondas pedidas (p. ej. 8 preguntas
 > para una partida de 10), la partida **no duplica preguntas**: juega las que haya y termina
 > informando que no hay suficientes preguntas.
@@ -87,8 +102,10 @@ y dobles de temporizador/reloj para no esperar 15 segundos reales.
 | Rondas | `GameRoundsTest` | inicio, pregunta nueva, respuestas, resultado, siguiente ronda, desconexión |
 | Tiempo y puntos | `GameTimerScoringTest` | cierre a los 15 s, rechazo de respuestas tardías, bonus por rapidez |
 | Flujo completo | `FullGameFlowTest` | 3 jugadores × 5 rondas hasta el ranking y la limpieza |
-| REST | `GameResourceTest` | endpoints HTTP, errores 400/404, sin fuga de `correctOption` |
-| BD | `QuestionRepositoryTest` | migraciones Flyway, categorías, agrupación por categoría |
+| Misma pantalla | `LocalTurnModeTest` | rotación de turnos, rechazo fuera de turno, calificación inmediata, timeout, regresión ONLINE |
+| WebSocket | `SessionRegistryTest` | envío asíncrono, sesiones rotas/cerradas sin bloquear el servidor |
+| REST | `GameResourceTest` | endpoints HTTP, modos ONLINE/LOCAL, errores 400/404, sin fuga de `correctOption` |
+| BD | `QuestionRepositoryTest` | migraciones Flyway (V1–V3), 10 preguntas por categoría, sin textos duplicados |
 
 ---
 
@@ -108,6 +125,7 @@ quiz-multijugador/
 │   ├── game/
 │   │   ├── GameSession.java      # estado de una partida (en memoria)
 │   │   ├── Player.java           # jugador en memoria
+│   │   ├── GameMode.java         # ONLINE (dispositivos) | LOCAL (misma pantalla)
 │   │   ├── GameService.java      # orquestador: rondas, tiempo, puntos, eventos
 │   │   ├── GameResource.java     # REST de partidas
 │   │   ├── GameEvents.java / WsMessage.java / GameEventBroadcaster.java
@@ -122,6 +140,7 @@ quiz-multijugador/
 │   ├── application.properties    # datasource, Flyway, perfil %test (H2)
 │   ├── db/migration/V1__create_questions.sql
 │   ├── db/migration/V2__insert_initial_questions.sql
+│   ├── db/migration/V3__add_more_questions.sql   # 10 preguntas por categoría
 │   └── META-INF/resources/       # frontend (index.html, css/, js/)
 └── src/test/java/...             # tests unitarios + @QuarkusTest
 ```
@@ -137,7 +156,7 @@ Base: `http://localhost:8080`
 
 | Método | Ruta | Descripción | Respuestas |
 |---|---|---|---|
-| `POST` | `/api/games` | Crea una partida. Cuerpo `{"totalRounds": 5\|10\|15}` | `201` → `GameDto` · `400` |
+| `POST` | `/api/games` | Crea una partida. Cuerpo `{"totalRounds": 5\|10\|15, "mode": "ONLINE"\|"LOCAL"}` (`mode` opcional; por defecto `ONLINE`) | `201` → `GameDto` · `400` |
 | `POST` | `/api/games/{gameId}/players` | Añade jugador. Cuerpo `{"nickname": "Ana"}` | `201` → `PlayerDto` · `400/404` |
 | `GET` | `/api/games/{gameId}` | Información pública de la partida | `200` → `GameDto` · `404` |
 | `GET` | `/api/questions/categories` | Categorías con preguntas activas | `200` → `["ANIMALES", …]` |
@@ -157,15 +176,20 @@ Mensajes **entrantes** (el cliente):
 ```json
 { "type": "JOIN",        "gameId": "ABC23", "playerId": "uuid" }
 { "type": "START_GAME" }
-{ "type": "ANSWER",      "option": "B" }
+{ "type": "ANSWER",      "option": "B" }                                   // modo ONLINE
+{ "type": "ANSWER",      "option": "B", "playerId": "uuid-del-turno" }     // modo LOCAL
 ```
+
+> En **ONLINE** la respuesta se atribuye al jugador enlazado a la sesión (el
+> `playerId` se ignora). En **LOCAL** el mensaje indica qué jugador responde
+> y el servidor exige que sea el del turno anunciado.
 
 Eventos **salientes** (formato `{"type", "gameId", "payload"}`):
 
 | Evento | Momento |
 |---|---|
-| `GAME_STARTED` | la partida empieza (jugadores + totalRounds) |
-| `NEW_QUESTION` | nueva pregunta: `round, category, questionId, question, optionA..D, timeLimitMs` — **sin `correctOption`** |
+| `GAME_STARTED` | la partida empieza (`players`, `totalRounds` y `mode`) |
+| `NEW_QUESTION` | nueva pregunta: `round, category, questionId, question, optionA..D, timeLimitMs` — **sin `correctOption`**; en modo `LOCAL` incluye además `player: {playerId, nickname}` (de quién es el turno) |
 | `PLAYER_ANSWERED` | un jugador respondió (avance `answeredCount/totalPlayers`) |
 | `QUESTION_RESULT` | fin de la ronda: **aquí sí** se revela `correctOption`, con aciertos, puntos y scores |
 | `NEXT_QUESTION` | transición a la siguiente ronda |
