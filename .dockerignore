@@ -1,0 +1,8 @@
+# Contexto de build Docker: excluye lo que no necesita la imagen
+target/
+.git/
+.idea/
+.vscode/
+*.iml
+README.md
+pgdata/

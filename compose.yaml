@@ -1,10 +1,13 @@
 # =============================================================
 # Quiz Multijugador — Docker Compose
-# Servicios:
-#   db  : PostgreSQL con volumen persistente (solo preguntas)
-#   app : aplicación Quarkus (FASE 1: aún no consume la BD)
+# PostgreSQL y la aplicación Quarkus corren JUNTOS en la misma
+# red de Docker:
+#   db  : PostgreSQL 17 con volumen persistente (db-data)
+#   app : aplicación Quarkus construida desde ./Dockerfile
 #
-# El estado de las partidas NO se persiste: vive en memoria de la app.
+# La app se conecta a la BD por el nombre del servicio "db" (DNS
+# interno de compose), no por localhost. El estado de las partidas
+# NO se persiste: vive en memoria de la app.
 # =============================================================
 
 name: quiz-multijugador
@@ -19,14 +22,16 @@ services:
       POSTGRES_PASSWORD: quiz
       POSTGRES_DB: quiz
     ports:
-      - "5432:5432"
+      # 5433 en el host para no chocar con otro PostgreSQL local en 5432.
+      # Internamente (red de compose) la BD escucha en el 5432 de siempre.
+      - "5433:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U quiz -d quiz"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 12
 
   app:
     build: .
@@ -36,7 +41,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      # Estas variables se activan en la FASE 2, cuando la app use la BD.
+      # Conexión interna dentro de la red de compose (servicio "db")
       QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://db:5432/quiz
       QUARKUS_DATASOURCE_USERNAME: quiz
       QUARKUS_DATASOURCE_PASSWORD: quiz
