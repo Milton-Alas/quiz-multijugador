@@ -297,3 +297,100 @@ body {
     .lobby-code { font-size: 2.6rem; }
     .question-text { font-size: 1.35rem; }
 }
+
+/* ============================================================
+   Modo MISMA PANTALLA (por turnos) + selector de modo al crear
+   ============================================================ */
+
+/* Selector de modalidad al crear partida */
+.btn-group-mode {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.mode-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 14px 10px;
+    border-radius: 1.2rem;
+    border: 3px solid #cfc3e8;
+    background: #fff;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.1s ease, border-color 0.1s ease;
+}
+
+.mode-option.selected {
+    background: #eef7ff;
+    border-color: var(--join);
+    box-shadow: 0 4px 0 rgba(13, 110, 253, 0.25);
+}
+
+.mode-icon { font-size: 1.8rem; }
+.mode-name { font-weight: 800; color: #2c2347; font-size: 1.05rem; }
+.mode-desc { font-size: 0.8rem; color: #6c757d; }
+
+/* Aviso de turno (misma pantalla) */
+.turn-banner {
+    border-radius: 1.4rem;
+    color: #fff;
+    padding: 12px 16px;
+    font-size: 1.6rem;
+    font-weight: 900;
+    margin-bottom: 14px;
+    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.12);
+    animation: turn-pop 0.35s ease;
+}
+
+@keyframes turn-pop {
+    0% { transform: scale(0.9); opacity: 0.4; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* Marcador de los 3 jugadores (misma pantalla) */
+.local-scoreboard {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.score-chip {
+    background: #fff;
+    border: 3px solid #cfc3e8;
+    border-radius: 1.4rem;
+    padding: 6px 14px;
+    font-weight: 800;
+    font-size: 1rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #2c2347;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.score-chip .chip-dot {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    color: #fff;
+    font-weight: 900;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.score-chip.active-turn {
+    transform: scale(1.12);
+    box-shadow: 0 0 0 4px #ffd166;
+}
+
+@media (max-width: 520px) {
+    .btn-group-mode { grid-template-columns: 1fr; }
+    .turn-banner { font-size: 1.25rem; }
+}
