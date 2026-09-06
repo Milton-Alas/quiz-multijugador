@@ -4,18 +4,18 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests de la FASE 2/4 sobre el repositorio Panache, usando H2 en memoria
- * con las migraciones Flyway aplicadas (V1 + V2).
+ * con las migraciones Flyway aplicadas (V1 + V2 + V3).
  */
 @QuarkusTest
 class QuestionRepositoryTest {
@@ -24,16 +24,16 @@ class QuestionRepositoryTest {
     QuestionRepository questionRepository;
 
     @Test
-    void migrationsLoadedOneQuestionPerInitialCategory() {
-        // V2 inserta exactamente una pregunta por cada categoría inicial
-        assertEquals(8, questionRepository.count());
-        assertEquals(8, questionRepository.countActive());
+    void migrationsLoadedTenQuestionsPerInitialCategory() {
+        // V2 inserta una pregunta por categoría; V3 añade 9 más por categoría.
+        assertEquals(80, questionRepository.count());
+        assertEquals(80, questionRepository.countActive());
     }
 
     @Test
     void everyStoredQuestionIsCompleteAndValid() {
         List<Question> all = questionRepository.listAll();
-        assertEquals(8, all.size());
+        assertEquals(80, all.size());
 
         for (Question q : all) {
             assertNotNull(q.category, "la categoría no debe ser nula");
@@ -47,6 +47,12 @@ class QuestionRepositoryTest {
             assertEquals("EASY", q.difficulty);
             assertTrue(q.active);
         }
+    }
+
+    @Test
+    void noDuplicateQuestionTextsInTheBank() {
+        List<String> texts = questionRepository.listAll().stream().map(q -> q.question).toList();
+        assertEquals(80, new HashSet<>(texts).size(), "no debe haber textos de pregunta repetidos");
     }
 
     @Test
@@ -65,17 +71,18 @@ class QuestionRepositoryTest {
     void availableIdsGroupedByCategoryExcludesUsedQuestions() {
         Map<String, List<Long>> all = questionRepository.findAvailableQuestionIdsGroupedByCategory(Set.of());
 
-        // 8 categorías, 1 pregunta cada una
+        // 8 categorías con 10 preguntas cada una
         assertEquals(8, all.size());
-        assertEquals(8, all.values().stream().mapToInt(List::size).sum());
+        assertEquals(80, all.values().stream().mapToInt(List::size).sum());
+        all.values().forEach(ids -> assertEquals(10, ids.size(), "10 preguntas por categoría"));
 
         Long usedId = all.get("FÚTBOL").get(0);
         Map<String, List<Long>> withoutUsed =
                 questionRepository.findAvailableQuestionIdsGroupedByCategory(Set.of(usedId));
 
-        // Al excluir la única pregunta de FÚTBOL, esa categoría desaparece
-        assertEquals(7, withoutUsed.values().stream().mapToInt(List::size).sum());
-        assertFalse(withoutUsed.containsKey("FÚTBOL"),
-                "una categoría agotada debe quedar fuera del mapa de disponibles");
+        // Al excluir una pregunta de FÚTBOL quedan 9 en esa categoría (no desaparece)
+        assertEquals(79, withoutUsed.values().stream().mapToInt(List::size).sum());
+        assertEquals(9, withoutUsed.get("FÚTBOL").size(),
+                "una categoría con más preguntas disponibles sigue en el mapa");
     }
 }
